@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from random import Random
 import math
+import queue
 
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
@@ -9,8 +10,8 @@ from tkinter.filedialog import askopenfilename
 random = Random()
 
 # Settings
-thMode = 0 #0 - BASIC, 1 - ADAPTIVE
-thLevel = 170
+thMode = 2 #0 - BASIC, 1 - ADAPTIVE, 2 - SINKING
+thLevel = 235
 
 maxMergeDist = 3
 apostArea = 15
@@ -22,9 +23,49 @@ def threshold(inImg):
 		return thImg
 	elif thMode == 1:
 		return cv2.adaptiveThreshold(inImg, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
+	elif thMode == 2:
+		return sinkMethod(inImg)
 
 	return None
 
+def sinkMethod(img):
+	print(img[0, 0])
+	height, width = img.shape
+	area = 65535
+	areas = {e: 0 for e in range(65535)}
+	areas[1] += 1
+	treshold = 20
+	myQueue = queue.Queue(width * height)
+	treshImg = norm_image = cv2.normalize(img, None, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_16U)
+	treshImg[:, :] = 0
+	for y in range(0, height):
+		for x in range(0, width):
+			if treshImg[y, x] == 0:
+				treshImg[y, x] = area
+				myQueue.put((y, x))
+				while not myQueue.empty():
+					currentY, currentX = myQueue.get()
+					treshImg[currentY, currentX] = area
+					if currentY - 1 >= 0 and treshImg[currentY - 1, currentX] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX])) <= treshold:
+						treshImg[currentY - 1, currentX] = area
+						myQueue.put((currentY - 1, currentX))
+					if currentX - 1 >= 0 and treshImg[currentY, currentX - 1] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY, currentX - 1])) <= treshold:
+						treshImg[currentY, currentX - 1] = area
+						myQueue.put((currentY, currentX - 1))
+					if currentY + 1 < height and treshImg[currentY + 1, currentX] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX])) <= treshold:
+						treshImg[currentY + 1, currentX] = area
+						myQueue.put((currentY + 1, currentX))
+					if currentX + 1 < width and treshImg[currentY, currentX + 1] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY, currentX + 1])) <= treshold:
+						treshImg[currentY, currentX + 1] = area
+						myQueue.put((currentY, currentX + 1))
+				print(str(area))
+				#cv2.imshow('Sink', treshImg)
+				#cv2.waitKey(0)
+				area -= 10
+
+	cv2.imshow('Sink', treshImg)
+	cv2.waitKey(0)
+	return img
 
 def safe_sample(img, x, y, w, h):
 	if x < 0 or y < 0 or x >= w or y >= h:
@@ -305,8 +346,8 @@ root.withdraw()
 # Create windows
 cv2.namedWindow("Input", cv2.WINDOW_NORMAL)
 
-cv2.namedWindow("Output")
-cv2.createTrackbar("Filter mode", "Output", thMode, 1, ui_update)
+cv2.namedWindow("Output", cv2.WINDOW_AUTOSIZE)
+cv2.createTrackbar("Filter mode", "Output", thMode, 2, ui_update)
 cv2.createTrackbar("Threshold", "Output", thLevel, 255, ui_update)
 
 # Do processing
