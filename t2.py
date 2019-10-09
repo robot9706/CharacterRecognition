@@ -29,43 +29,53 @@ def threshold(inImg):
 	return None
 
 def sinkMethod(img):
-	print(img[0, 0])
 	height, width = img.shape
 	area = 65535
 	areas = {e: 0 for e in range(65535)}
 	areas[1] += 1
-	treshold = 20
+	thresholdNo = 12
+	lowestvalue = 0
 	myQueue = queue.Queue(width * height)
 	treshImg = norm_image = cv2.normalize(img, None, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_16U)
-	treshImg[:, :] = 0
+	treshImg[:, :] = lowestvalue
 	for y in range(0, height):
 		for x in range(0, width):
-			if treshImg[y, x] == 0:
+			if treshImg[y, x] == lowestvalue:
 				treshImg[y, x] = area
 				myQueue.put((y, x))
 				while not myQueue.empty():
 					currentY, currentX = myQueue.get()
 					treshImg[currentY, currentX] = area
-					if currentY - 1 >= 0 and treshImg[currentY - 1, currentX] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX])) <= treshold:
+					if currentY - 1 >= 0 and treshImg[currentY - 1, currentX] == lowestvalue and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX])) <= thresholdNo:
 						treshImg[currentY - 1, currentX] = area
 						myQueue.put((currentY - 1, currentX))
-					if currentX - 1 >= 0 and treshImg[currentY, currentX - 1] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY, currentX - 1])) <= treshold:
+					if currentX - 1 >= 0 and treshImg[currentY, currentX - 1] == lowestvalue and abs(int(img[currentY, currentX]) - int(img[currentY, currentX - 1])) <= thresholdNo:
 						treshImg[currentY, currentX - 1] = area
 						myQueue.put((currentY, currentX - 1))
-					if currentY + 1 < height and treshImg[currentY + 1, currentX] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX])) <= treshold:
+					if currentY + 1 < height and treshImg[currentY + 1, currentX] == lowestvalue and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX])) <= thresholdNo:
 						treshImg[currentY + 1, currentX] = area
 						myQueue.put((currentY + 1, currentX))
-					if currentX + 1 < width and treshImg[currentY, currentX + 1] == 0 and abs(int(img[currentY, currentX]) - int(img[currentY, currentX + 1])) <= treshold:
+					if currentX + 1 < width and treshImg[currentY, currentX + 1] == lowestvalue and abs(int(img[currentY, currentX]) - int(img[currentY, currentX + 1])) <= thresholdNo:
 						treshImg[currentY, currentX + 1] = area
 						myQueue.put((currentY, currentX + 1))
-				print(str(area))
+				print(str(width + height))
 				#cv2.imshow('Sink', treshImg)
 				#cv2.waitKey(0)
-				area -= 10
+				area = 1
 
-	cv2.imshow('Sink', treshImg)
+	treshImg = norm_image = cv2.normalize(treshImg, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+	thVal, thImg = cv2.threshold(treshImg, 125, 255, cv2.THRESH_BINARY)
+	kern = cv2.getStructuringElement(cv2.MORPH_CROSS, (1, 1))
+	#thImg = cv2.dilate(thImg, kern)
+	#thImg = cv2.erode(thImg, kern)
+	#thImg = cv2.erode(thImg, kern)
+	#thImg = cv2.dilate(thImg, kern)
+	cv2.imshow('Orig', cv2.resize(img, (width * 1, height * 1)))
+	cv2.imshow('Sink', cv2.resize(thImg, (width * 1, height * 1)))
+	#cv2.resizeWindow('Sink', 600, 800)
 	cv2.waitKey(0)
-	return img
+	return thImg
 
 def safe_sample(img, x, y, w, h):
 	if x < 0 or y < 0 or x >= w or y >= h:
@@ -346,7 +356,7 @@ root.withdraw()
 # Create windows
 cv2.namedWindow("Input", cv2.WINDOW_NORMAL)
 
-cv2.namedWindow("Output", cv2.WINDOW_AUTOSIZE)
+cv2.namedWindow("Output")
 cv2.createTrackbar("Filter mode", "Output", thMode, 2, ui_update)
 cv2.createTrackbar("Threshold", "Output", thLevel, 255, ui_update)
 
