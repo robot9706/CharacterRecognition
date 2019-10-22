@@ -15,28 +15,30 @@ thLevel = 235
 
 maxMergeDist = 3
 apostArea = 15
+angleGlob = 0
 
 # Creates a filtered binary image
 def threshold(inImg):
+	global angleGlob
 	if thMode == 0:
 		thVal, thImg = cv2.threshold(inImg, thLevel, 255, cv2.THRESH_BINARY)
 		return thImg
 	elif thMode == 1:
 		return cv2.adaptiveThreshold(inImg, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
 	elif thMode == 2:
-		return sinkMethod(inImg)
+		ret, angleGlob = sinkMethod(inImg, True)
+		ret = sinkMethod(ret, False)[0]
+		return ret
 
 	return None
 
-def sinkMethod(img):
+def sinkMethod(img, rotate):
 	height, width = img.shape
-	area = 65535
-	areas = {e: 0 for e in range(65535)}
-	areas[1] += 1
+	area = 255
 	thresholdNo = 12
 	lowestvalue = 0
 	myQueue = queue.Queue(width * height)
-	treshImg = norm_image = cv2.normalize(img, None, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_16U)
+	treshImg = img.copy()
 	treshImg[:, :] = lowestvalue
 	for y in range(0, height):
 		for x in range(0, width):
@@ -58,24 +60,39 @@ def sinkMethod(img):
 					if currentX + 1 < width and treshImg[currentY, currentX + 1] == lowestvalue and abs(int(img[currentY, currentX]) - int(img[currentY, currentX + 1])) <= thresholdNo:
 						treshImg[currentY, currentX + 1] = area
 						myQueue.put((currentY, currentX + 1))
-				print(str(width + height))
+				#print(str(width + height))
 				#cv2.imshow('Sink', treshImg)
 				#cv2.waitKey(0)
 				area = 1
 
-	treshImg = norm_image = cv2.normalize(treshImg, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-
-	thVal, thImg = cv2.threshold(treshImg, 125, 255, cv2.THRESH_BINARY)
-	kern = cv2.getStructuringElement(cv2.MORPH_CROSS, (1, 1))
+	treshImg = cv2.threshold(treshImg, 128, 255, cv2.THRESH_BINARY)[1]
+	#kern = cv2.getStructuringElement(cv2.MORPH_CROSS, (1, 1))
 	#thImg = cv2.dilate(thImg, kern)
 	#thImg = cv2.erode(thImg, kern)
 	#thImg = cv2.erode(thImg, kern)
 	#thImg = cv2.dilate(thImg, kern)
 	cv2.imshow('Orig', cv2.resize(img, (width * 1, height * 1)))
-	cv2.imshow('Sink', cv2.resize(thImg, (width * 1, height * 1)))
-	#cv2.resizeWindow('Sink', 600, 800)
+	cv2.imshow('Sink', cv2.resize(treshImg, (width * 1, height * 1)))
+	angle = 0
+	if rotate:
+		coords = np.column_stack(np.where(treshImg == 0))
+		angle = cv2.minAreaRect(coords)[-1]
+		if angle < -45:
+			angle = -(90 + angle)
+		else:
+			angle = -angle
+
+		center = (width // 2, height // 2)
+		M = cv2.getRotationMatrix2D(center, angle, 1.0)
+		treshImg = cv2.warpAffine(treshImg, M, (width, height), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+		cv2.imshow('Rotate', cv2.resize(treshImg, (width * 1, height * 1)))
+
 	cv2.waitKey(0)
-	return thImg
+	cv2.destroyWindow('Orig')
+	cv2.destroyWindow('Sink')
+	if rotate:
+		cv2.destroyWindow('Rotate')
+	return treshImg, angle
 
 def safe_sample(img, x, y, w, h):
 	if x < 0 or y < 0 or x >= w or y >= h:
@@ -333,6 +350,10 @@ def processImage(path):
 
 		output[y:(y+procHeight),0:procWidth] = processedLine
 
+	global angleGlob
+	center = (width // 2, height // 2)
+	M = cv2.getRotationMatrix2D(center, -angleGlob, 1.0)
+	output = cv2.warpAffine(output, M, (width, height), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 	cv2.imshow("Output", output)
 
 	return
