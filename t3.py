@@ -3,20 +3,11 @@ import numpy as np
 from random import Random
 import math
 
+# TOOLS
 random = Random()
 
-def thresh(im):
-	gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-
-	#thr = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
-	thVal, thr = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
-
-	return thr
-
-
 def random_color():
-	return (int(random.random() * 225) + 30, int(random.random() * 225) + 30, int(random.random() * 225) + 30)
-
+	return (int(random.random() * 205) + 50, int(random.random() * 205) + 50, int(random.random() * 205) + 50)
 
 def rect_inside(a, b):
 	aleft, atop, aright, abottom = a
@@ -25,7 +16,7 @@ def rect_inside(a, b):
 	return ((bleft >= aleft) and (btop >= atop) and (bright <= aright) and (bbottom <= abottom))
 
 
-def rect_center(r):
+def rect_center(r): # Returns (X,Y)
 	left, top, right, bottom = r
 	return (left+((right - left) / 2), top + ((bottom - top) / 2))
 
@@ -35,14 +26,25 @@ def dist(p1, p2):
 	p2x, p2y = p2
 	return math.sqrt( ((p1x-p2x)**2)+((p1y-p2y)**2) )
 
+
 def angle(p1, p2):
 	p1x, p1y = p1
 	p2x, p2y = p2
 	return math.degrees(math.atan2(p2y - p1y, p2x - p1x)) % 360
 
 
-# Returns [ (contour, rect)* ]
-def mergecontours(list, xMax, yMax):
+# STEP 1 - THRESHOLD
+def thresh(im):
+	gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+
+	#thr = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
+	thVal, thr = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+
+	return thr
+
+
+# STEP 2 - CONTOUR FILTER
+def mergecontours(list, xMax, yMax): # Returns [ (contour, rect)* ]
 	proc = []
 
 	# Create a (countour, rectangle, processed) tuple of each contour, where
@@ -89,111 +91,111 @@ def mergecontours(list, xMax, yMax):
 	return result
 
 
-def findnear(list, fromIndex):
-	near = []
+# STEP 3 - CREATE TILES
+class TiledImage:
+	tiles = [] # Packed 2D array, elements: [ [ (contour, rect, originalIndex)* ]* ]
+	numX = 0
+	numY = 0
+	tileSize = 0
 
-	processList = []
-	processList.append(fromIndex)
+	def __init__(self, tilesX, tilesY, tileSize, contours): # contours = [ (contour, rect)* ]
+		self.numX = tilesX
+		self.numY = tilesY
+		self.tileSize = tileSize
 
-	while len(processList) > 0:
-		procIndex = processList.pop()
+		# Init the array
+		num = self.numX * self.numY
+		for i in range(0, num):
+			self.tiles.append([]) # Append an empty array @ index i.
 
-		contour, rect, proc = list[procIndex]
-		c1 = rect_center(rect)
-		near.append((contour, rect))
-		list[procIndex] = (contour, rect, True)
+		# Put contours into tiles
+		for i in range(0, len(contours)):
+			contour, rect = contours[i]
+			x, y = rect_center(rect)
 
-		minDist = -1
-		minIndex = -1
+			tx, ty = self.tileAt(x, y)
+			if tx < 0 or ty < 0 or tx >= self.numX or ty >= self.numY:
+				print ("Contour skipped, out of bounds!")
+				continue
 
-		for i in range(0, len(list)):
-			contour, rect, processed = list[i]
-			if processed: continue
+			offset = self.tileOffset(tx, ty)
+			self.tiles[offset].append((contour, rect, i))
 
-			# Find the distance
-			c2 = rect_center(rect)
+	def tileOffset(self, tx, ty):
+		return tx + ty * self.numX
 
-			d = dist(c1, c2)
-			a = angle(c1, c2)
-			if math.fabs(a) > 20: continue
-			if d > 200: continue
+	def tileAt(self, pixelX, pixelY):
+		return (math.floor(pixelX / self.tileSize), math.floor(pixelY / self.tileSize))
 
-			if minDist == -1 or (d < minDist):
-				minDist = d
-				minIndex = i
+	def getTile(self, tx, ty):
+		if tx < 0 or ty < 0 or tx >= self.numX or ty >= self.numY:
+			return []
 
-		if minIndex != -1:
-			nextc, nextr, nexto = list[minIndex]
-			near.append((nextc, nextr))
-			list[minIndex] = (nextc, nextr, True)
+		return self.tiles[self.tileOffset(tx, ty)]
 
-			processList.append(minIndex)
-
-	return near
-
-
-def group_distangle(group1, group2):
-	minDist = -1
-	minAngle = -1
-
-	for i in range(0, len(group1)):
-		c1, r1 = group1[i]
-		center1 = rect_center(r1)
-
-		for j in range(0, len(group2)):
-			c2, r2 = group2[j]
-
-			center2 = rect_center(r2)
-
-			d = dist(center1, center2)
-			a = angle(center1, center2)
-
-			if math.fabs(d) > 100: continue
-
-			if (a < 20 and a > 340) or (a > 160 and a < 190):
-				if minDist == -1 or (d < minDist):
-					minDist = d
-					minAngle = a
-
-	return (minDist, minAngle)
-
-def merge_groups(groups):
-	for i in range(0, len(groups)):
-		for j in range(0, len(groups)):
-			if i == j: continue
-
-			dist, angle = group_distangle(groups[i], groups[j])
-			if dist != -1:
-				newList = []
-				for a in range(0, len(groups)):
-					if a == i or a == j: continue
-					newList.append(groups[a])
-				newList.append(groups[i] + groups[j])
-
-				return (newList, True)
-
-	return (groups, False)
+	def getNearby(self, tx, ty):
+		return self.getTile(tx, ty) + self.getTile(tx + 1, ty) + self.getTile(tx, ty - 1) + self.getTile(tx + 1, ty - 1) + self.getTile(tx, ty + 1) + self.getTile(tx + 1, ty + 1) + self.getTile(tx - 1, ty) + self.getTile(tx - 1, ty + 1) + self.getTile(tx - 1, ty - 1)
 
 
-def findlines(list):
-	# Convert the list
-	groups = []
-	for contour, rect in list:
-		groups.append([(contour, rect)]) # False - not used
+def findlines(list, thrImage):
+	height, width = thrImage.shape
+	tileSize = 200
+	tiles = TiledImage(math.ceil(width / tileSize), math.ceil(height / tileSize), tileSize, list)
 
-	# Process
-	process = True
-	while process:
-		newGroups, modified = merge_groups(groups)
-		if modified:
-			groups = newGroups
-		else:
-			process = False
+	maxDistance = 30
+	maxAngle = 30
+
+	# Start processing tiles
+	groups = [ -1 for i in range(len(list)) ] # Indexed by contour indexes, each element = the group index of that element
+	nextGroup = 0
+
+	for tileX in range(0, tiles.numX):
+		for tileY in range(0, tiles.numY):
+			tile = tiles.getTile(tileX, tileY)
+			if len(tile) == 0:
+				continue
+
+			nearby = tiles.getNearby(tileX, tileY)
+
+			for contour, rect, index in tile:
+				#if groups[index] > -1:
+				#	continue # Item is already processed
+
+				c1 = rect_center(rect)
+
+				# Put the element into a new group
+				groups[index] = nextGroup
+				nextGroup = nextGroup + 1
+
+				# Find other elements
+				for other in nearby:
+					otherContour, otherRect, otherIndex = other
+					if otherIndex == index:
+						continue # Already processed or it's the same item
+
+					c2 = rect_center(otherRect)
+
+					d = dist(c1, c2)
+					a = angle(c1, c2)
+
+					if d < maxDistance: # Distance check
+						if (a > (180 - maxAngle) and a < (180 + maxAngle)) or (a > (360 - maxAngle) or a < maxAngle): # Angle check
+							# Merge
+							if groups[otherIndex] > -1: # The element is already in a group, merge them
+								oldGroup = groups[otherIndex]
+								newGroupIndex = groups[index]
+								for gIndex in range(0, len(groups)):
+									if groups[gIndex] == oldGroup:
+										groups[gIndex] = newGroupIndex
+							else: # The element is not in a group
+								groups[otherIndex] = groups[index]
 
 	return groups
 
 
-def getareas(img):
+def getareas(img, thrImage):
+	print("Processing image...")
+
 	height, width = img.shape
 	resultImage = np.zeros((height, width, 3), np.uint8)
 	resultImage[:,:] = (255,255,255)
@@ -207,35 +209,68 @@ def getareas(img):
 	filtered = mergecontours(contours, width, height)
 	print ("Filtered contours: {}".format(len(filtered)))
 
-	# Debug drawing
-	# for contour, rect in filtered:
-	#	left, top, right, bottom = rect
-	#	cv2.rectangle(resultImage, (left, top), (right, bottom), random_color(), cv2.FILLED)
-	# for contour, rect in filtered:
-	#	cv2.fillPoly(resultImage, pts=[contour], color=(0, 0, 0))
-
 	# Find areas of letters
-	areas = findlines(filtered)
-	print("Groups: {}".format(len(areas)))
+	areas = findlines(filtered, thrImage)
+	distGroups = set(areas)
+	print("Groups: {}".format(len(distGroups)))
 
-	for l in areas:
-		clr = random_color()
-		for contour, rect in l:
-			left, top, right, bottom = rect
-			cv2.rectangle(resultImage, (left, top), (right, bottom), clr, cv2.FILLED)
-			cv2.fillPoly(resultImage, pts=[contour], color=(0, 0, 0))
+	print("Debug rendering...")
+
+	# Pre process and draw groups
+	groupColors = [0 for i in range(0, len(areas))]
+	for groupIndex in distGroups:
+		groupColors[groupIndex] = random_color()
+
+		left = width
+		top = height
+		right = 0
+		bottom = 0
+
+		for elemIndex in range(0, len(filtered)):
+			if not areas[elemIndex] == groupIndex:
+				continue
+
+			contour, rect = filtered[elemIndex]
+			eleft, etop, eright, ebottom = rect
+
+			if eleft < left:
+				left = eleft
+			if etop < top:
+				top = etop
+			if eright > right:
+				right = eright
+			if ebottom > bottom:
+				bottom = ebottom
+
+		cv2.putText(resultImage, str(groupIndex), (left, top - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100,100,100), 1)
+		cv2.rectangle(resultImage, (left, top), (right, bottom), (100,100,100))
+
+	# Draw group content
+
+	for i in range(0, len(filtered)):
+		contour, rect = filtered[i]
+		group = areas[i]
+
+		if group == -1:
+			continue
+
+		color = groupColors[group]
+
+		left, top, right, bottom = rect
+		cv2.rectangle(resultImage, (left, top), (right, bottom), color, cv2.FILLED)
+		cv2.fillPoly(resultImage, pts=[contour], color=(0, 0, 0))
+
+	print ("Done")
 
 	return resultImage
 
-
-inputImage = cv2.imread("imgs/test_img.png")
+# DO PROCESSING
+inputImage = cv2.imread("imgs/test_11.png")
 cv2.imshow("Input", inputImage)
 
 thrImage = thresh(inputImage)
 cv2.imwrite("thr.png", thrImage)
 
-res = getareas(thrImage)
-
+res = getareas(thrImage, thrImage)
 cv2.imshow("Output", res)
-
 cv2.waitKey(0)
