@@ -137,13 +137,21 @@ class TiledImage:
 		return self.getTile(tx, ty) + self.getTile(tx + 1, ty) + self.getTile(tx, ty - 1) + self.getTile(tx + 1, ty - 1) + self.getTile(tx, ty + 1) + self.getTile(tx + 1, ty + 1) + self.getTile(tx - 1, ty) + self.getTile(tx - 1, ty + 1) + self.getTile(tx - 1, ty - 1)
 
 
-def findlines(list, thrImage):
+def findlines(list, thrImage, baseAngle):
 	height, width = thrImage.shape
 	tileSize = 200
 	tiles = TiledImage(math.ceil(width / tileSize), math.ceil(height / tileSize), tileSize, list)
 
+	# Rules
 	maxDistance = 30
 	maxAngle = 30
+
+	# Calculate max degrees
+	minDeg1 = (180 - baseAngle - maxAngle)
+	maxDeg1 = (180 - baseAngle + maxAngle)
+
+	minDeg2 = (360 - baseAngle - maxAngle)
+	maxDeg2 = -baseAngle + maxAngle
 
 	# Start processing tiles
 	groups = [ -1 for i in range(len(list)) ] # Indexed by contour indexes, each element = the group index of that element
@@ -179,7 +187,7 @@ def findlines(list, thrImage):
 					a = angle(c1, c2)
 
 					if d < maxDistance: # Distance check
-						if (a > (180 - maxAngle) and a < (180 + maxAngle)) or (a > (360 - maxAngle) or a < maxAngle): # Angle check
+						if (a > minDeg1 and a < maxDeg1) or (a > minDeg2 or a < maxDeg2): # Angle check
 							# Merge
 							if groups[otherIndex] > -1: # The element is already in a group, merge them
 								oldGroup = groups[otherIndex]
@@ -193,7 +201,7 @@ def findlines(list, thrImage):
 	return groups
 
 
-def getareas(img, thrImage):
+def getareas(img, thrImage, baseAngle):
 	print("Processing image...")
 
 	height, width = img.shape
@@ -210,7 +218,7 @@ def getareas(img, thrImage):
 	print ("Filtered contours: {}".format(len(filtered)))
 
 	# Find areas of letters
-	areas = findlines(filtered, thrImage)
+	areas = findlines(filtered, thrImage, baseAngle)
 	distGroups = set(areas)
 	print("Groups: {}".format(len(distGroups)))
 
@@ -271,6 +279,7 @@ cv2.imshow("Input", inputImage)
 thrImage = thresh(inputImage)
 cv2.imwrite("thr.png", thrImage)
 
-res = getareas(thrImage, thrImage)
+res = getareas(thrImage, thrImage, 0)
+cv2.imwrite("Output.png", res)
 cv2.imshow("Output", res)
 cv2.waitKey(0)
