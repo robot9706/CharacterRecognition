@@ -3,6 +3,7 @@ import numpy as np
 import math
 
 def sinkMethod(img, showSteps = False):
+    print("Sink method...")
     height, width = img.shape
     area = 255
     thresholdNo = 35
@@ -43,9 +44,6 @@ def sinkMethod(img, showSteps = False):
     threshImg = cv2.threshold(threshImg, 128, 255, cv2.THRESH_BINARY)[1]
 
     if showSteps:
-       cv2.imshow("line", linedetectimg)
-
-    if showSteps:
        cv2.imshow('Sink', threshImg)
        cv2.waitKey(0)
 
@@ -56,7 +54,7 @@ def getLinesAngle(image, showUI = False):
 	kern = cv2.getStructuringElement(cv2.MORPH_CROSS, (2, 2))
 
 	linedetectimg = image.copy()
-	for i in range(0, 10):
+	for i in range(0, 5):
 		linedetectimg = cv2.erode(linedetectimg, kern)
 
 	if showUI:

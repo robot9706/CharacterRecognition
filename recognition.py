@@ -204,6 +204,7 @@ def getareas(img, maxDist, maxAngle, baseAngle):
 	print ("Filtered contours: {}".format(len(filtered)))
 
 	# Find areas of letters
+	print ("Finding lines...")
 	areas = findlines(filtered, img, maxDist, maxAngle, baseAngle)
 	distGroups = set(areas)
 	print("Groups: {}".format(len(distGroups)))
