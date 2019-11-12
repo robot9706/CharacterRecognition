@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from random import Random
 import math
-import queue
+import imutils
 
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
@@ -27,94 +27,75 @@ def threshold(inImg):
     elif thMode == 1:
         return cv2.adaptiveThreshold(inImg, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
     elif thMode == 2:
-        ret, angleGlob = sinkMethod(inImg, True)
-        ret = sinkMethod(ret, False)[0]
+        ret, angleGlob = sinkMethod(inImg)
         return ret
 
     return None
 
 
-def sinkMethod(img, rotate):
+def sinkMethod(img):
     height, width = img.shape
     area = 255
-    thresholdNo = 50
-    lowerthreshold = 220
+    thresholdNo = 35
+    lowerthreshold = 200
     lowestvalue = 0
-    myQueue = queue.Queue(width * height)
-    treshImg = img.copy()
-    treshImg[:, :] = lowestvalue
-    #for y in range(0, height):
-     #   for x in range(0, width):
-    if treshImg[0, 0] == lowestvalue:
-        treshImg[0, 0] = area
-        myQueue.put((0, 0))
-        while not myQueue.empty():
-            currentY, currentX = myQueue.get()
-            treshImg[currentY, currentX] = area
-            if currentY - 1 >= 0 and treshImg[currentY - 1, currentX] == lowestvalue and img[currentY - 1, currentX] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX])) <= thresholdNo:
-                treshImg[currentY - 1, currentX] = area
-                myQueue.put((currentY - 1, currentX))
-            if currentY - 1 >= 0 and currentX - 1 >= 0 and treshImg[currentY - 1, currentX - 1] == lowestvalue and img[currentY - 1, currentX - 1] >= lowerthreshold and  abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX - 1])) <= thresholdNo:
-                treshImg[currentY - 1, currentX - 1] = area
-                myQueue.put((currentY - 1, currentX - 1))
-            if currentX - 1 >= 0 and treshImg[currentY, currentX - 1] == lowestvalue and img[currentY, currentX - 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY, currentX - 1])) <= thresholdNo:
-                treshImg[currentY, currentX - 1] = area
-                myQueue.put((currentY, currentX - 1))
-            if currentY + 1 < height and currentX - 1 >= 0 and treshImg[currentY + 1, currentX - 1] == lowestvalue and img[currentY + 1, currentX - 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX - 1])) <= thresholdNo:
-                treshImg[currentY + 1, currentX - 1] = area
-                myQueue.put((currentY + 1, currentX - 1))
-            if currentY + 1 < height and treshImg[currentY + 1, currentX] == lowestvalue and img[currentY + 1, currentX] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX])) <= thresholdNo:
-                treshImg[currentY + 1, currentX] = area
-                myQueue.put((currentY + 1, currentX))
-            if currentY + 1 < height and currentX + 1 < width and treshImg[currentY + 1, currentX + 1] == lowestvalue and img[currentY + 1, currentX + 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX + 1])) <= thresholdNo:
-                treshImg[currentY + 1, currentX + 1] = area
-                myQueue.put((currentY + 1, currentX + 1))
-            if currentX + 1 < width and treshImg[currentY, currentX + 1] == lowestvalue and img[currentY, currentX + 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY, currentX + 1])) <= thresholdNo:
-                treshImg[currentY, currentX + 1] = area
-                myQueue.put((currentY, currentX + 1))
-            if currentY - 1 >= 0 and currentX + 1 < width and treshImg[currentY - 1, currentX + 1] == lowestvalue and img[currentY - 1, currentX + 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX + 1])) <= thresholdNo:
-                treshImg[currentY - 1, currentX + 1] = area
-                myQueue.put((currentY - 1, currentX + 1))
-        #area = 1
+    myset = set()
+    threshImg = img.copy()
+    threshImg[:, :] = lowestvalue
+    threshImg[0, 0] = area
+    myset.add((0, 0))
+    while len(myset) != 0:
+        currentY, currentX = myset.pop()
+        if currentY - 1 >= 0 and threshImg[currentY - 1, currentX] == lowestvalue and img[currentY - 1, currentX] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX])) <= thresholdNo:
+            threshImg[currentY - 1, currentX] = area
+            myset.add((currentY - 1, currentX))
+        if currentY - 1 >= 0 and currentX - 1 >= 0 and threshImg[currentY - 1, currentX - 1] == lowestvalue and img[currentY - 1, currentX - 1] >= lowerthreshold and  abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX - 1])) <= thresholdNo:
+            threshImg[currentY - 1, currentX - 1] = area
+            myset.add((currentY - 1, currentX - 1))
+        if currentX - 1 >= 0 and threshImg[currentY, currentX - 1] == lowestvalue and img[currentY, currentX - 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY, currentX - 1])) <= thresholdNo:
+            threshImg[currentY, currentX - 1] = area
+            myset.add((currentY, currentX - 1))
+        if currentY + 1 < height and currentX - 1 >= 0 and threshImg[currentY + 1, currentX - 1] == lowestvalue and img[currentY + 1, currentX - 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX - 1])) <= thresholdNo:
+            threshImg[currentY + 1, currentX - 1] = area
+            myset.add((currentY + 1, currentX - 1))
+        if currentY + 1 < height and threshImg[currentY + 1, currentX] == lowestvalue and img[currentY + 1, currentX] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX])) <= thresholdNo:
+            threshImg[currentY + 1, currentX] = area
+            myset.add((currentY + 1, currentX))
+        if currentY + 1 < height and currentX + 1 < width and threshImg[currentY + 1, currentX + 1] == lowestvalue and img[currentY + 1, currentX + 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY + 1, currentX + 1])) <= thresholdNo:
+            threshImg[currentY + 1, currentX + 1] = area
+            myset.add((currentY + 1, currentX + 1))
+        if currentX + 1 < width and threshImg[currentY, currentX + 1] == lowestvalue and img[currentY, currentX + 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY, currentX + 1])) <= thresholdNo:
+            threshImg[currentY, currentX + 1] = area
+            myset.add((currentY, currentX + 1))
+        if currentY - 1 >= 0 and currentX + 1 < width and threshImg[currentY - 1, currentX + 1] == lowestvalue and img[currentY - 1, currentX + 1] >= lowerthreshold and abs(int(img[currentY, currentX]) - int(img[currentY - 1, currentX + 1])) <= thresholdNo:
+            threshImg[currentY - 1, currentX + 1] = area
+            myset.add((currentY - 1, currentX + 1))
 
-    treshImg = cv2.threshold(treshImg, 128, 255, cv2.THRESH_BINARY)[1]
-    # kern = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
-    # treshImg = cv2.dilate(treshImg, kern)
-    # treshImg = cv2.erode(treshImg, kern)
-    # treshImg = cv2.erode(treshImg, kern)
-    # treshImg = cv2.dilate(treshImg, kern)
-    cv2.imwrite("balazs.png", img)
-    cv2.imshow('Orig', cv2.resize(img, (width * 1, height * 1)))
-    cv2.imwrite("balazs1.png", treshImg)
-    cv2.imshow('Sink', cv2.resize(treshImg, (width * 1, height * 1)))
-    angle = 0
-    if rotate:
-        coords = np.column_stack(np.where(treshImg == 0))
-        angle = cv2.minAreaRect(coords)[-1]
-        if angle < -45:
-            angle = -(90 + angle)
-        else:
-            angle = -angle
+    threshImg = cv2.threshold(threshImg, 128, 255, cv2.THRESH_BINARY)[1]
 
-        center = (width // 2, height // 2)
-        M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        treshImg = cv2.warpAffine(treshImg, M, (width, height), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-        cv2.imwrite("balazs2.png", treshImg)
-        cv2.imshow('Rotate', cv2.resize(treshImg, (width * 1, height * 1)))
-        rect = cv2.minAreaRect(coords)
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
-        img2 = img.copy()
-        img2 = cv2.drawContours(img2, [box], 0, (0, 0, 255), 2)
-        cv2.imshow('Rot', cv2.resize(img2, (width * 1, height * 1)))
+    kern = cv2.getStructuringElement(cv2.MORPH_CROSS, (2, 2))
+    linedetectimg = threshImg.copy()
+    for i in range(0, 10):
+        linedetectimg = cv2.erode(linedetectimg, kern)
+
+    cv2.imshow("erode", linedetectimg)
+
+    linedetectimg = cv2.Canny(linedetectimg, 100, 200, None, 5, True)
+    linesP = cv2.HoughLinesP(linedetectimg, 1, np.pi / 180, 50, None, 50, 10)
+    linedetectimg = cv2.cvtColor(linedetectimg, cv2.COLOR_GRAY2BGR)
+    l = linesP[0][0]
+    cv2.line(linedetectimg, (l[0], l[1]), (l[2], l[3]), (0, 0, 255), 2, cv2.LINE_AA)
+    cv2.imshow("line", linedetectimg)
+    angle = (math.atan((l[1] - l[3]) / (l[0] - l[2])) * 180 / math.pi)
+
+    print(angle)
+    cv2.imshow('Sink', threshImg)
 
     cv2.waitKey(0)
-    cv2.destroyWindow('Orig')
     cv2.destroyWindow('Sink')
-    if rotate:
-        cv2.destroyWindow('Rotate')
-        cv2.destroyWindow('Rot')
-    return treshImg, angle
+    cv2.destroyWindow('line')
+    cv2.destroyWindow('erode')
+    return threshImg, angle
 
 
 def safe_sample(img, x, y, w, h):
