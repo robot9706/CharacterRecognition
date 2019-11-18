@@ -1,0 +1,9 @@
+usage: main [-h] [-s] [-d [DIST]] [-a [ANGLE]] [-f FILE] [--debug]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -s, --sink
+  -d [DIST], --dist [DIST]
+  -a [ANGLE], --angle [ANGLE]
+  -f FILE, --file FILE
+  --debug
