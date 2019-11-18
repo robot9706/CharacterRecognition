@@ -51,4 +51,8 @@ root.call('wm', 'attributes', '.', '-topmost', True)
 fileName = args.file
 if fileName == "" or fileName == None or len(fileName) == 0:
 	fileName = askopenfilename()
-lineDetect(fileName, args.sink, args.dist, args.angle, args.debug)
+
+if fileName == "" or fileName == None or len(fileName) == 0:
+	print("No input file.")
+else:
+	lineDetect(fileName, args.sink, args.dist, args.angle, args.debug)
